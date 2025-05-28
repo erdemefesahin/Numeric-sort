@@ -1,0 +1,102 @@
+"""
+Number Sorter Utility
+A simple tool to sort large files of numbers efficiently
+"""
+
+
+import heapq
+import tempfile
+import os
+import sys
+
+
+def sort_number_file(input_filename, output_filename=None, chunk_size=1000):
+    """
+    Sorts a file containing one number per line
+
+    Parameters:
+        input_filename: Path to the input file
+        output_filename: Where to save sorted results (prints to screen if None)
+        chunk_size: How many numbers to process at once (default: 1000)
+    """
+    # Temporary storage for sorted chunks
+    temp_files = []
+
+    print(f"Processing file: {input_filename}")
+
+    try:
+        # Step 1: Read and sort in chunks
+        print("Sorting file in chunks...")
+        with open(input_filename, 'r') as infile:
+            current_chunk = []
+            chunk_count = 0
+
+            for line in infile:
+                try:
+                    num = float(line.strip())
+                    current_chunk.append(num)
+
+                    if len(current_chunk) >= chunk_size:
+                        current_chunk.sort()
+                        temp_file = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+                        temp_file.writelines(f"{n}\n" for n in current_chunk)
+                        temp_file.close()
+                        temp_files.append(temp_file.name)
+                        current_chunk = []
+                        chunk_count += 1
+                        print(f"Processed chunk {chunk_count}", end='\r')
+
+                except ValueError:
+                    continue
+
+            # Handle remaining numbers
+            if current_chunk:
+                current_chunk.sort()
+                temp_file = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+                temp_file.writelines(f"{n}\n" for n in current_chunk)
+                temp_file.close()
+                temp_files.append(temp_file.name)
+
+        print(f"\nFinished processing {chunk_count + 1} chunks")
+
+        # Step 2: Merge sorted chunks
+        print("Combining sorted results...")
+        file_handles = [open(f, 'r') for f in temp_files]
+        number_streams = [(float(line.strip()) for line in fh) for fh in file_handles]
+
+        if output_filename:
+            with open(output_filename, 'w') as outfile:
+                for num in heapq.merge(*number_streams):
+                    outfile.write(f"{num}\n")
+            print(f"Saved sorted results to {output_filename}")
+        else:
+            print("\nSorted Results:")
+            for i, num in enumerate(heapq.merge(*number_streams), 1):
+                print(num)
+                if i % 1000 == 0:
+                    print(f"Displayed {i} numbers...", end='\r')
+            print(f"\nFinished displaying {i} numbers")
+
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+    finally:
+        # Clean up temporary files
+        for fh in file_handles:
+            fh.close()
+        for f in temp_files:
+            try:
+                os.unlink(f)
+            except:
+                pass
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python number_sorter.py input_file [output_file]")
+        print("If output_file is omitted, results will print to screen")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+
+    sort_number_file(input_file, output_file)
